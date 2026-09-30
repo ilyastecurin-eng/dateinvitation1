@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Check project files
+        run: |
+          missing=0
+          for f in package.json index.html vite.config.js \
+                   src/main.jsx src/App.jsx src/content.js src/styles.css \
+                   src/booking.js src/date.js \
+                   src/IntroScreen.jsx src/DateQuestion.jsx src/DeclinedScreen.jsx \
+                   src/ScheduleScreen.jsx src/Calendar.jsx src/TimePicker.jsx \
+                   src/BookingConfirmation.jsx src/CuteAnimation.jsx; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Не найден файл $f"
+              missing=1
+            fi
+          done
+          echo "Файлы в репозитории:"
+          find . -path ./.git -prune -o -type f -print | sort
+          exit $missing
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
